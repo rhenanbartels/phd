@@ -83,6 +83,13 @@ def match_ins_exp(alpha_ins, copd_ins, control_ins, alpha_exp, copd_exp,
     return new_alpha, new_copd, new_control
 
 
+def diff_ins_exp(ins, exp):
+    cols = list(ins.columns)[:-2]
+    diff = ins[cols] - exp[cols]
+    diff[['group', 'name']] = ins[['group', 'name']]
+    return diff
+
+
 if __name__ == "__main__":
     ins = loadmat(
             '../Results/Analise_2_2_40/ins_2_2_40.mat',
@@ -119,5 +126,7 @@ if __name__ == "__main__":
             control_exp
     )
 
-    all_ins = pandas.concat([alpha_ins, copd_ins, control_ins])
-    all_exp = pandas.concat([alpha_exp, copd_exp, control_exp])
+    all_ins = pandas.concat([alpha_ins, copd_ins, control_ins]).reset_index()
+    all_exp = pandas.concat([alpha_exp, copd_exp, control_exp]).reset_index()
+
+    diff = diff_ins_exp(all_ins, all_exp)
