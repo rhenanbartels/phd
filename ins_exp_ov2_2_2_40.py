@@ -1,12 +1,14 @@
 import pandas
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 from scipy.io import loadmat
 
 plt.ion()
 
 X_RANGE = list(range(2, 42, 2))
+TITLE = 'DF / DF[0]'
 
 
 def create_cols(x_range):
@@ -61,10 +63,10 @@ def create_matrix_rel_first_abs(patients, group):
     return matrix, patient_names
 
 
-def create_all_frames(alpha, copd, control):
-    alpha_df, alpha_names = create_matrix(alpha, 'alpha')
-    copd_df, copd_names = create_matrix(copd, 'copd')
-    control_df, control_names = create_matrix(control, 'control')
+def create_all_frames(alpha, copd, control, func):
+    alpha_df, alpha_names = func(alpha, 'alpha')
+    copd_df, copd_names = func(copd, 'copd')
+    control_df, control_names = func(control, 'control')
 
     alpha_df = create_data_frame(alpha_df, alpha_names, 'alpha', X_RANGE)
     copd_df = create_data_frame(copd_df, copd_names, 'copd', X_RANGE)
@@ -83,11 +85,35 @@ def match_ins_exp(alpha_ins, copd_ins, control_ins, alpha_exp, copd_exp,
     return new_alpha, new_copd, new_control
 
 
-def diff_ins_exp(ins, exp):
-    cols = list(ins.columns)[:-2]
-    diff = ins[cols] - exp[cols]
-    diff[['group', 'name']] = ins[['group', 'name']]
-    return diff
+def show_diff(all_ins, all_exp, interval):
+    avg_ins = all_ins[['group'] + interval].groupby('group').mean()
+    avg_exp = all_exp[['group'] + interval].groupby('group').mean()
+
+    avg_diff = (np.abs(avg_ins - avg_exp) / avg_exp * 100).reset_index()
+    df_diff_melted = pandas.melt(avg_diff, id_vars=['group'])
+    plot = sns.pointplot(x='variable', y='value', hue='group',
+                         data=df_diff_melted)
+    plot.set_xticklabels(plot.get_xticklabels(), rotation=70)
+    plt.xlabel('Length Scale (mm)')
+    plt.ylabel('Percentage Diff (%) Ins - Exp')
+    plt.title(TITLE)
+
+
+def group_cv(all_ins, all_exp, interval):
+    cv = lambda x: x.std() / x.mean()
+    cv_ins = all_ins[['group'] + interval].groupby('group').agg(cv).reset_index()
+    cv_exp = all_exp[['group'] + interval].groupby('group').agg(cv).reset_index()
+
+    cv_ins = pandas.melt(cv_ins, id_vars=['group']).reset_index()
+    cv_exp = pandas.melt(cv_exp, id_vars=['group']).reset_index()
+
+    plt.figure()
+    plot = sns.pointplot(x='variable', y='value', hue='group',
+                         data=cv_ins)
+    plot.set_xticklabels(plot.get_xticklabels(), rotation=70)
+    plt.xlabel('Length Scale (mm)')
+    plt.ylabel('Percentage Diff (%) Ins - Exp')
+    plt.title(TITLE)
 
 
 if __name__ == "__main__":
@@ -106,12 +132,14 @@ if __name__ == "__main__":
     alpha_ins, copd_ins, control_ins = create_all_frames(
             ins['res_alpha_ins_2'],
             ins['res_copd_ins_2'],
-            ins['res_control_ins_2']
+            ins['res_control_ins_2'],
+            create_matrix_rel_first
     )
     alpha_exp, copd_exp, control_exp = create_all_frames(
             exp['res_alpha_exp_2'],
             exp['res_copd_exp_2'],
-            exp['res_control_exp_2']
+            exp['res_control_exp_2'],
+            create_matrix_rel_first
     )
 
     # Jorcelene de COPD não está no condição INS
@@ -129,4 +157,5 @@ if __name__ == "__main__":
     all_ins = pandas.concat([alpha_ins, copd_ins, control_ins]).reset_index()
     all_exp = pandas.concat([alpha_exp, copd_exp, control_exp]).reset_index()
 
-    diff = diff_ins_exp(all_ins, all_exp)
+    show_diff(all_ins, all_exp, create_cols(X_RANGE))
+    group_cv(all_ins, all_exp, create_cols(X_RANGE))
